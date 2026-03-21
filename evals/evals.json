@@ -1,0 +1,26 @@
+{
+  "skill_name": "video-extractor",
+  "evals": [
+    {
+      "id": 1,
+      "name": "bilibili_subtitle_extraction",
+      "prompt": "提取这个B站视频的字幕：https://www.bilibili.com/video/BV173wdzgEFu，然后总结视频内容",
+      "expected_output": "成功下载字幕文件(srt格式)，提取纯文本，生成视频内容总结（主题、核心内容、关键要点）",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "youtube_subtitle_extraction",
+      "prompt": "提取这个YouTube视频的字幕：https://www.youtube.com/watch?v=dQw4w9WgXcQ，然后总结视频内容",
+      "expected_output": "成功下载字幕文件，提取纯文本，生成视频内容总结",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "bilibili_with_cookie",
+      "prompt": "用户提供了B站Cookie：SESSDATA=xxx; bili_jct=xxx; DedeUserID=xxx; DedeUserID__ckMd5=xxx，帮我提取这个视频的字幕：https://www.bilibili.com/video/BV1xx",
+      "expected_output": "创建cookie文件，使用yt-dlp下载字幕，处理字幕并输出总结",
+      "files": []
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# Cookie文件
+*cookies*.txt
+*cookie*.txt
+
+# 临时文件
+*.tmp
+*.log
+
+# 视频/字幕下载文件
+*.srt
+*.mp4
+*.m4a
+subtitle*.txt
+video*_subtitle*
+video*_text*

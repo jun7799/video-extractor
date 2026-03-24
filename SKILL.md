@@ -17,9 +17,29 @@ compatibility: yt-dlp, Python, 飞书API(可选)
 
 ## 工作流程
 
-### 步骤1: 检测平台并提取字幕
+### 步骤1: 获取视频元数据
+
+```bash
+# 获取完整视频信息
+yt-dlp --print "%(title)s|%(duration_string)s|%(uploader)s|%(upload_date)s|%(view_count)s" "<视频URL>" 2>/dev/null
+```
+
+### 步骤2: 检测平台并提取字幕
 
 根据视频URL识别平台，使用对应工具提取字幕：
+
+**YouTube视频（推荐流程）：**
+```bash
+# 1. 列出可用字幕
+yt-dlp --list-subs "<视频URL>"
+
+# 2. 按优先级下载字幕（自动 fallback）
+# 优先级: zh-Hans > zh-Hant > en > en-orig
+yt-dlp --write-auto-subs --sub-lang zh-Hans --convert-subs srt "<视频URL>" -o "subtitle" --skip-download
+
+# 如果中文失败，fallback 到英文
+yt-dlp --write-auto-subs --sub-lang en --convert-subs srt "<视频URL>" -o "subtitle" --skip-download
+```
 
 **B站视频：**
 ```bash
@@ -30,35 +50,51 @@ yt-dlp --cookies <cookie文件> --list-subs "<视频URL>"
 yt-dlp --cookies <cookie文件> --write-subs --sub-lang ai-zh --convert-subs srt "<视频URL>" -o "subtitle"
 ```
 
-**YouTube视频：**
-```bash
-# 列出字幕
-yt-dlp --list-subs "<视频URL>"
+### 步骤3: 处理字幕文件（含去重）
 
-# 下载字幕
-yt-dlp --write-subs --sub-lang zh-CN --convert-subs srt "<视频URL>" -o "subtitle"
+**重要**：YouTube自动生成的字幕有大量重复，必须去重处理。
+
+使用内置脚本一键处理：
+```bash
+python <skill_dir>/scripts/extract_text.py subtitle.<lang>.srt -o subtitle_text.txt --dedupe
 ```
 
-### 步骤2: 处理字幕文件
+去重逻辑：
+- 移除连续重复的短语（YouTube字幕特性）
+- 合并断句
+- 统计字符数和行数
 
-1. 读取SRT字幕文件
-2. 提取纯文本（去除时间戳和序号）
-3. 统计字幕时长和字数
-
-### 步骤3: 生成内容总结
+### 步骤4: 生成内容总结
 
 对提取的文本进行分析，生成结构化总结：
 - 视频主题
 - 核心内容/观点
 - 关键要点（3-5条）
+- 金句摘录
 - 视频风格/来源
 
-### 步骤4: 保存到飞书（可选）
+### 步骤5: 保存到飞书（可选）
 
 如果用户要求保存到飞书：
 1. 读取飞书配置（App ID, App Secret）
 2. 调用飞书API创建记录
 3. 包含：标题、URL、总结内容、关键词
+
+## 一键执行脚本
+
+对于 YouTube 视频，可以使用以下一键命令：
+
+```bash
+# 设置工作目录
+cd <用户指定目录>
+
+# 下载字幕（带 fallback）
+yt-dlp --write-auto-subs --sub-lang zh-Hans --convert-subs srt "<URL>" -o "subtitle" --skip-download 2>&1 || \
+yt-dlp --write-auto-subs --sub-lang en --convert-subs srt "<URL>" -o "subtitle" --skip-download 2>&1
+
+# 提取纯文本（含去重）
+python <skill_dir>/scripts/extract_text.py subtitle.*.srt -o subtitle_text.txt --dedupe
+```
 
 ## Cookie管理
 
@@ -89,41 +125,79 @@ yt-dlp --write-subs --sub-lang zh-CN --convert-subs srt "<视频URL>" -o "subtit
 
 | 错误 | 解决方案 |
 |------|---------|
-| 无字幕可下载 | 提示用户登录或使用弹幕 |
+| HTTP 429 (Too Many Requests) | 切换语言 fallback，等待后重试 |
+| 无字幕可下载 | 尝试自动字幕，提示用户登录 |
 | Cookie无效 | 提示用户重新提供Cookie |
 | 网络超时 | 重试3次，每次间隔5秒 |
 | 视频不存在 | 提示检查视频URL |
+| 字幕文件过大 | 分段处理，提取关键内容 |
 
 ## 输出格式
 
 ### 字幕文件
 - `subtitle.<lang>.srt` - SRT格式字幕
-- `subtitle_text.txt` - 纯文本（去除时间戳）
+- `subtitle_text.txt` - 纯文本（去重后）
 
 ### 内容总结
 ```markdown
-## 视频内容总结
+# 视频内容总结
 
-**平台**: B站/YouTube
-**视频ID**: xxx
-**时长**: xx:xx
-**字幕行数**: xxx
+## 基本信息
+| 项目 | 内容 |
+|------|------|
+| **平台** | YouTube/B站 |
+| **视频ID** | xxx |
+| **时长** | xx:xx |
+| **标题** | xxx |
 
-### 主题
+## 主题概述
 
-### 核心内容
+## 核心内容
 
-### 关键要点
+### 1. 主题一
+### 2. 主题二
+### 3. 主题三
+
+## 关键要点
 1. xxx
 2. xxx
 3. xxx
+
+## 金句摘录
+> "xxx"
+
+## 总结
 ```
 
 ## 依赖
 
 ```bash
+# 必需
 pip install yt-dlp
+
+# 可选（解决 YouTube 下载警告）
+# 安装 deno 或 node.js
+# Windows: winget install DenoLand.Deno
+# Mac: brew install deno
 ```
+
+## 已知问题与解决方案
+
+### 1. YouTube 字幕重复
+**问题**：YouTube 自动字幕每句话重复3次
+**解决**：使用 `--dedupe` 参数去重
+
+### 2. HTTP 429 错误
+**问题**：请求过于频繁被限制
+**解决**：自动 fallback 到其他语言
+
+### 3. Windows 编码问题
+**问题**：Python 输出中文乱码
+**解决**：脚本已内置 UTF-8 编码处理
+
+### 4. 字幕文件过大
+**问题**：长视频字幕超过读取限制
+**解决**：分段预览，提取关键部分
 
 ## 扩展计划
 
@@ -131,3 +205,4 @@ pip install yt-dlp
 - [ ] 支持本地视频语音识别
 - [ ] 支持多语言字幕翻译
 - [ ] 一键生成解读视频（调用content-video-generator）
+- [ ] 添加进度条显示

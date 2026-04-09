@@ -41,12 +41,36 @@ yt-dlp --write-auto-subs --sub-lang zh-Hans --convert-subs srt "<视频URL>" -o 
 yt-dlp --write-auto-subs --sub-lang en --convert-subs srt "<视频URL>" -o "subtitle" --skip-download
 ```
 
-**B站视频：**
-```bash
-# 列出可用字幕（需要Cookie）
-yt-dlp --cookies <cookie文件> --list-subs "<视频URL>"
+**B站视频（推荐：直接调API）：**
 
-# 下载中文字幕（AI字幕优先）
+**重要**：`yt-dlp` 和 `/x/player/v2` 接口经常拿不到B站AI字幕，必须使用 `/x/v2/dm/view` 接口。
+
+```bash
+# 方式1（推荐）：使用内置脚本，自动完成全流程
+python <skill_dir>/scripts/bilibili_subtitle.py BV1DCDjBRExV -o subtitle_text.txt
+
+# 也可以传入完整URL，脚本会自动提取BV号
+python <skill_dir>/scripts/bilibili_subtitle.py "https://www.bilibili.com/video/BV1DCDjBRExV" -o subtitle_text.txt
+
+# 仅查看视频信息（不下载字幕）
+python <skill_dir>/scripts/bilibili_subtitle.py BV1DCDjBRExV --info
+
+# 预览前500字
+python <skill_dir>/scripts/bilibili_subtitle.py BV1DCDjBRExV --preview 500
+
+# 指定Cookie文件
+python <skill_dir>/scripts/bilibili_subtitle.py BV1DCDjBRExV --cookie /path/to/bilibili_cookies.txt -o subtitle_text.txt
+```
+
+脚本工作原理：
+1. 从 `api.bilibili.com/x/web-interface/view` 获取 cid、aid
+2. 从 `api.bilibili.com/x/v2/dm/view` 获取AI字幕URL（此接口比 yt-dlp 用的 `/x/player/v2` 更可靠）
+3. 下载字幕JSON，提取纯文本
+4. 同时保存 `.json`（原始字幕）和 `.txt`（纯文本）
+
+**方式2（fallback）：yt-dlp**
+```bash
+# 如果脚本失败，可尝试 yt-dlp（成功率较低）
 yt-dlp --cookies <cookie文件> --write-subs --sub-lang ai-zh --convert-subs srt "<视频URL>" -o "subtitle"
 ```
 
@@ -126,11 +150,13 @@ python <skill_dir>/scripts/extract_text.py subtitle.*.srt -o subtitle_text.txt -
 | 错误 | 解决方案 |
 |------|---------|
 | HTTP 429 (Too Many Requests) | 切换语言 fallback，等待后重试 |
-| 无字幕可下载 | 尝试自动字幕，提示用户登录 |
-| Cookie无效 | 提示用户重新提供Cookie |
+| 无字幕可下载 | B站用API脚本重试；YouTube尝试自动字幕 |
+| Cookie无效/过期 | 提示用户重新提供Cookie或更新SESSDATA |
+| B站API返回空字幕 | yt-dlp fallback，或该视频确实无AI字幕 |
 | 网络超时 | 重试3次，每次间隔5秒 |
 | 视频不存在 | 提示检查视频URL |
-| 字幕文件过大 | 分段处理，提取关键内容 |
+| 字幕文件过大 | 分段处理，提取关键部分 |
+| Windows编码乱码 | 脚本已内置UTF-8处理；yt-dlp用Python subprocess调用 |
 
 ## 输出格式
 
@@ -173,7 +199,7 @@ python <skill_dir>/scripts/extract_text.py subtitle.*.srt -o subtitle_text.txt -
 
 ```bash
 # 必需
-pip install yt-dlp
+pip install yt-dlp requests
 
 # 可选（解决 YouTube 下载警告）
 # 安装 deno 或 node.js
@@ -183,19 +209,24 @@ pip install yt-dlp
 
 ## 已知问题与解决方案
 
-### 1. YouTube 字幕重复
+### 1. B站 yt-dlp 拿不到AI字幕
+**问题**：`yt-dlp --write-subs --sub-lang ai-zh` 和 `/x/player/v2` API 经常返回空字幕
+**根因**：B站的AI字幕信息在 `/x/v2/dm/view` 接口中，不在 `/x/player/v2` 中，yt-dlp 用的是后者
+**解决**：使用 `bilibili_subtitle.py` 脚本直接调 `/x/v2/dm/view` 接口获取字幕URL
+
+### 2. YouTube 字幕重复
 **问题**：YouTube 自动字幕每句话重复3次
 **解决**：使用 `--dedupe` 参数去重
 
-### 2. HTTP 429 错误
+### 3. HTTP 429 错误
 **问题**：请求过于频繁被限制
 **解决**：自动 fallback 到其他语言
 
-### 3. Windows 编码问题
-**问题**：Python 输出中文乱码
-**解决**：脚本已内置 UTF-8 编码处理
+### 4. Windows 编码问题
+**问题**：Python/yt-dlp 输出中文乱码
+**解决**：脚本已内置 UTF-8 编码处理；yt-dlp 用 Python subprocess 调用并指定 encoding
 
-### 4. 字幕文件过大
+### 5. 字幕文件过大
 **问题**：长视频字幕超过读取限制
 **解决**：分段预览，提取关键部分
 
